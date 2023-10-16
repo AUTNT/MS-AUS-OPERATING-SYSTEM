@@ -1,0 +1,253 @@
+eax ,0x9;
+kernel.bin 0x9 mov ebx, 0x70000;
+0x70000 mov ecx, 200;
+call rd_disk_m_32...
+
+    call kernel_init
+
+        mov byte [gs:0x280],
+    'i' mov byte [gs:0x282], 'n' mov byte [gs:0x284], 'i' mov byte [gs:0x286], 't' mov byte [gs:0x28a], 'k' mov byte [gs:0x28c], 'e' mov byte [gs:0x28e], 'r' mov byte [gs:0x290], 'n' mov byte [gs:0x292], 'e' mov byte [gs:0x294], 'l'
+mov
+    mov esp
+    0xc009f000 jmp 0xc0001500
+
+    ;
+kernel.binsegment
+    kernel_init : xor eax,
+    eax xor ebx, ebx;
+xor ecx, ecx;
+xor edx, edx;
+
+mov dx, [0x70000 + 42];
+mov ebx, [0x70000 + 28] e_phoff add ebx, 0x70000 mov cx, [0x70000 + 44] e_phnum
+
+                                                             .each_segment : cmp byte[ebx + 0],
+    0;
+p_type = 0,
+    je.PTNULL
+
+        push dword[ebx + 16];
+p_filesz(mem_cpy) 
+    mov eax,
+    [ebx + 4] add eax, 0x70000 push eax;
+p_offsed + (mem_cpy)
+               push dword[ebx + 8];
+p_vaddr(mem_cpy)
+    call mem_cpy
+    add esp,
+    12
+        .PTNULL : add ebx,
+    edx;
+ebx
+    loop.each_segment
+        ret
+    
+（dst,
+    src, size） mem_cpy : cld push ebp mov ebp, esp push ecx
+
+                                                    mov edi,
+                          [ebp + 8];
+dst
+    mov esi,
+    [ebp + 12];
+src
+    mov ecx,
+    [ebp + 16];
+size
+    rep movsb
+
+        pop ecx
+            pop ebp
+                ret
+
+                    rd_disk_m_32 :
+
+    mov esi,
+    eax
+        mov di,
+    cx
+
+        mov dx,
+    0x1f2 mov al,
+    cl
+        out dx,
+    al
+
+        mov eax,
+    esi
+
+        mov dx,
+    0x1f3 out dx,
+    al
+
+        mov cl,
+    8 shr eax,
+    cl
+        mov dx,
+    0x1f4 out dx,
+    al
+
+        shr eax,
+    cl
+        mov dx,
+    0x1f5 out dx,
+    al
+
+        shr eax,
+    cl
+        and al,
+    0x0f or al,
+    0xe0 mov dx,
+    0x1f6 out dx,
+    al
+
+        mov dx,
+    0x1f7 mov al,
+    0x20 out dx,
+    al
+
+        .not_ready : nop
+                         in al,
+    dx
+        and al,
+    0x88 cmp al,
+    0x08 jnz.not_ready
+
+        mov ax,
+    di
+        mov dx,
+    256 mul dx
+        mov cx,
+    ax
+        mov dx,
+    0x1f0
+
+        .go_on_read : in ax,
+    dx
+    mov [ds:ebx],
+    ax
+        add ebx,
+    2 loop.go_on_read
+        ret
+
+            main.c
+
+#include "print.h"
+    int
+    main(void)
+{
+    put_str("put_str finish\n");
+    while (1)
+        ;
+    return 0;
+}
+
+print.h  
+
+#ifndef __LIB_KERNEL_PRINT_H
+#define __LIB_KERNEL_PRINT_H
+#include "stdint.h"
+    void
+    put_char(uint8_t char_asci);
+void put_str(char *message);
+#endif
+1. 2. 3. 4. 5. 6. print.asm
+
+        TI_GDT equ 0 RPL0 equ 0 SELECTOR_VIDEO equ(0x0003 << 3) +
+        TI_GDT + RPL0
+
+                     [bits 32] section.text
+
+                 global put_str put_str : push ebx push ecx
+    xor ecx,
+    ecx    
+    mov ebx,
+    [esp + 12]
+        .goon : mov cl,
+    [ebx] cmp cl, 0 jz.str_over push ecx call put_char add esp, 4 inc ebx jmp.goon.str_over : pop ecx pop ebx ret
+
+                                                                                              global put_char put_char : pushad
+
+                                                                                                                         mov ax,
+    SELECTOR_VIDEO
+    mov gs,
+    ax
+
+    mov dx,
+    0x03d4 mov al, 0x0e out dx, al mov dx, 0x03d5 in al, dx mov ah, al
+
+    mov dx,
+    0x03d4 mov al, 0x0f out dx, al mov dx, 0x03d5 in al, dx
+
+    mov bx,
+    ax
+
+    mov ecx,
+    [esp + 36] cmp cl, 0xd jz.is_carriage_return cmp cl, 0xa jz.is_line_feed
+
+                                                         cmp cl,
+    0x8 jz.is_backspace
+    jmp.put_other
+
+        .is_backspace : dec bx
+                        shl bx,
+    1 mov byte [gs:bx], 0x20 inc bx mov byte [gs:bx], 0x07 shr bx, 1 jmp.set_cursor
+
+                                                                       .put_other : shl bx,
+    1
+mov [gs:bx],
+    cl   
+    inc bx
+    mov byte [gs:bx],
+    0x07 shr bx, 1 inc bx cmp bx, 2000 jl.set_cursor  
+
+                                      .is_line_feed :.is_carriage_return:;
+cr(\r) xor dx, dx mov ax, bx mov si, 80 div si sub bx, dx
+
+                                                           .is_carriage_return_end : add bx,
+    80 cmp bx, 2000 .is_line_feed_end : jl.set_cursor
+
+                                            .roll_screen : cld mov ecx,
+    960 mov esi, 0xc00b80a0 mov edi, 0xc00b8000 rep movsd
+
+    mov ebx,
+    3840 mov ecx, 80 .cls : mov word [gs:ebx], 0x0720 add ebx, 2 loop.cls mov bx, 1920;
+
+.set_cursor :
+
+    mov dx,
+    0x03d4 mov al, 0x0e out dx, al mov dx, 0x03d5 mov al, bh out dx, al
+
+                                                                         mov dx,
+    0x03d4 mov al, 0x0f out dx, al mov dx, 0x03d5 mov al, bl out dx, al.put_char_done : popad ret
+  
+                                                                                            Makefile
+
+                                                                                                mbr.bin : mbr.asm nasm -
+                                                                          I include / -o out / mbr.bin mbr.asm - l out / mbr.lst
+
+                                                                                                                            loader.bin : loader.asm nasm -
+                                                                         I include / -o out / loader.bin loader.asm - l out / loader.lst
+
+                                                                                                                                  kernel.bin : kernel /
+                                                                                                                          main.c nasm -
+                                               MOV DL “char“
+                                               MOV AH, 2H
+                                               INT 21H
+                                               
+                                
+                                               
+                                                                         f elf - o out / print.o lib /kernel / print.asm gcc -lib / kernel / -c -o out / main.o kernel / main.c ld - Ttext 0xc000150 - e main - o out/kernel.bin out / main.o out /print.o
+                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                       os.raw : mbr.bin loader.bin kernel.bin
+                                                                                                                                                                                                                    bochs / bin / bximage -
+                                                                         -mode ="flat"- size = 60 -q target / os.raw dd if = out/mbr.bin of = target/ os.raw bs = 512 count = 1 dd if out/loader.bin of =target / os.raw bs = 512 count = 4 seek = 2 dd if = out / kernel.bin of =target / os.raw bs = 512 count = 200 seek = 9
+                                                                                                                                                                                                                                                                                                                              brun : make  install make only -
+                                                                                                                                                                                                                                                                                                                              bochs -run 
+                                                                                                                                                                                                                                                                                                                                                only -
+                                                                                                                                                                                                                                                                                                                                    bochs - run :../ b ochs / bin / bochs - f../ bochs / bochs / bochsrc.disk -q
+                                                                                                                                                                                                                                                                                                                                                                                                                   
+                                                                                                                                                                                                                                                                                                                                                                                                                   linstall : make clean make -
+                                                                                                                                                                                                                                                                                                                                                                                                                              r os.ram
+                                                                                                                                                                                                                                                                                                                                                                                                                             
+                                                                                                                                                                                                                                          
